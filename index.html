@@ -67,15 +67,25 @@
       width: 30%;
       background-color: aquamarine;
     }
+
+    .groupList-items {
+      height: 50px;
+      width: 100%;
+      background: #131313;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
   </style>
 </head>
 
 <body>
   <div style="display: flex;height: 100%;width: 100%;">
     <!-- 左侧房间号、在线人数 -->
-      <div class="groupList">
-          
-      </div>
+    <div class="groupList">
+
+    </div>
     <!-- 右侧 -->
     <div>
       <!-- 消息区 -->
@@ -100,25 +110,45 @@
         serverOffset: 0
       }
     });
-
+    const renderMsg = ({ user, text }) => {
+      const item = document.createElement('li');
+      item.textContent = `${user}:${text}`;
+      messages.appendChild(item);
+    }
     const form = document.getElementById('form');
     const input = document.getElementById('input');
     const messages = document.getElementById('messages');
+    const groupEl = document.querySelector('.groupList');
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (input.value) {
         const clientOffset = counter++;
-        socket.emit('chat message',socket.id, name, room, input.value, clientOffset);
+        socket.emit('chat message', socket.id, name, room, input.value, clientOffset);
         console.log(socket.id, name, room, input.value, clientOffset)
         input.value = '';
       }
     });
-
+    socket.on('connect', () => {
+      socket.emit('join', name, room);
+      socket.on('message', (message) => {
+        renderMsg(message)
+      })
+      socket.on('groupList', (groupList) => {
+        console.log(groupList);
+        groupEl.innerHTML = ''
+        groupList.forEach(obj => {
+          const roomName = Object.keys(obj)[0];
+          const users = obj[roomName];
+          const item = document.createElement('div');
+          item.className = 'groupList-items';
+          item.innerText = `房间名称:${roomName} 房间人数:${users.length}`
+          groupEl.appendChild(item)
+        })
+      })
+    })
     socket.on('chat message', (msg, serverOffset) => {
-      const item = document.createElement('li');
-      item.textContent = msg;
-      messages.appendChild(item);
+      renderMsg(msg)
       window.scrollTo(0, document.body.scrollHeight);
       socket.auth.serverOffset = serverOffset;
     });
