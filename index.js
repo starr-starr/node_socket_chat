@@ -31,11 +31,26 @@ if (cluster.isPrimary) {
   });
 
   await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      socket_id TEXT UNIQUE,
+      name TEXT,
+      room_id INTEGER
+    );
+  
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      client_offset TEXT UNIQUE,
-      content TEXT
+      user_id INTEGER,
+      content TEXT,
+      room_id INTEGER,
+      client_offset TEXT,
+      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS rooms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE
+    );    
   `);
 
   const app = express();
@@ -43,7 +58,6 @@ if (cluster.isPrimary) {
   const io = new Server(server, {
     connectionStateRecovery: {},// 此功能将临时存储服务器发送的所有事件，并在客户端重新连接时尝试恢复客户端的状态：
     adapter: createAdapter()  // 集群适配器，用于在不同进程之间共享 WebSocket 连接的状态，从而实现多进程间的实时通信。
-
   });
   //  SSR 服务端渲染
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -53,19 +67,40 @@ if (cluster.isPrimary) {
   });
 
   io.on('connection', async (socket) => {
-    socket.on('chat message', async (msg, clientOffset, callback) => {
+
+    socket.on('chat message', async (socket_id, name, room, msg, clientOffset, callback) => {
       let result;
-      // 将发送的所有消息保存至数据库
+      // 将发送的所有消息保存至数据库 
       try {
-        result = await db.run('INSERT INTO messages (content, client_offset) VALUES (?, ?)', msg, clientOffset);
+        // 检查房间是否已存在
+        let existingRoom = await db.get('SELECT id FROM rooms WHERE name = ? LIMIT 1', room);
+        if (!existingRoom) {
+          // 如果房间不存在，则插入新房间
+          await db.run('INSERT INTO rooms (name) VALUES (?)', room);
+        }
+
+        // 检查用户是否已存在
+        let existingUser = await db.get('SELECT id FROM users WHERE socket_id = ? LIMIT 1', socket_id);
+        if (!existingUser) {
+          // 如果用户不存在，则插入新用户
+          await db.run('INSERT INTO users (socket_id, name, room_id) VALUES (?, ?, (SELECT id FROM rooms WHERE name = ?))', socket_id, name, room);
+        } else {
+          // 如果用户已存在，则更新用户所在的房间
+          await db.run('UPDATE users SET room_id = (SELECT id FROM rooms WHERE name = ?) WHERE socket_id = ?', room, socket_id);
+        }
+
+        // 插入消息
+        result = await db.run('INSERT INTO messages (user_id, content, room_id, client_offset) VALUES ((SELECT id FROM users WHERE socket_id = ?), ?, (SELECT id FROM rooms WHERE name = ?), ?)', socket_id, msg, room, clientOffset);
+
       } catch (e) {
-        if (e.errno === 19 /* SQLITE_CONSTRAINT */ ) {
+        if (e.errno === 19 /* SQLITE_CONSTRAINT */) {
           callback();
         } else {
           // nothing to do, just let the client retry
         }
         return;
       }
+      console.log(msg, result.lastID);
       // 广播至频道
       io.emit('chat message', msg, result.lastID);
       callback();
@@ -89,19 +124,19 @@ if (cluster.isPrimary) {
          -  1 重连
          - process1 查询 id > 0 的所有 content  
     */
-    if (!socket.recovered) {
-      try {
-        await db.each('SELECT id, content FROM messages WHERE id > ?',
-            //  socket.handshake.auth.serverOffset 是为了处理客户端手动设置了一个非零的偏移量
-          [socket.handshake.auth.serverOffset || 0], 
-          (_err, row) => {
-            socket.emit('chat message', row.content, row.id);
-          }
-        )
-      } catch (e) {
-        // something went wrong
-      }
-    }
+    // if (!socket.recovered) {
+    //   try {
+    //     await db.each('SELECT id, content FROM messages WHERE id > ?',
+    //       //  socket.handshake.auth.serverOffset 是为了处理客户端手动设置了一个非零的偏移量
+    //       [socket.handshake.auth.serverOffset || 0],
+    //       (_err, row) => {
+    //         socket.emit('chat message', row.content, row.id);
+    //       }
+    //     )
+    //   } catch (e) {
+    //     // something went wrong
+    //   }
+    // }
   });
 
   const port = process.env.PORT;
