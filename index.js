@@ -33,8 +33,7 @@ if (cluster.isPrimary) {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      socket_id TEXT UNIQUE,
-      name TEXT,
+      name TEXT UNIQUE,
       room_id INTEGER
     );
   
@@ -90,13 +89,13 @@ if (cluster.isPrimary) {
       socket.join(room);
 
       // 检查用户是否已存在
-      const existingUser = await db.get('SELECT id FROM users WHERE socket_id = ? LIMIT 1', socket.id);
+      const existingUser = await db.get('SELECT id FROM users WHERE name = ? LIMIT 1', name);
       if (!existingUser) {
         // 如果用户不存在，则插入新用户
-        await db.run('INSERT INTO users (socket_id, name, room_id) VALUES (?, ?, (SELECT id FROM rooms WHERE name = ?))', socket.id, name, room);
+        await db.run('INSERT INTO users (name, room_id) VALUES (?, (SELECT id FROM rooms WHERE name = ?))', name, room);
       } else {
         // 如果用户已存在，则更新用户所在的房间
-        await db.run('UPDATE users SET room_id = (SELECT id FROM rooms WHERE name = ?) WHERE socket_id = ?', room, socket.id);
+        await db.run('UPDATE users SET room_id = (SELECT id FROM rooms WHERE name = ?) WHERE name = ?', room, name);
       }
 
       // 查询数据库获取每个房间内的用户列表
@@ -121,12 +120,12 @@ if (cluster.isPrimary) {
       socket.emit('message', { user: '管理员', text: `${name}进入了房间` });
       socket.broadcast.to(room).emit('message', { user: '管理员', text: `${name}进入了房间` });
     });
-    socket.on('chat message', async (socket_id, name, room, msg, clientOffset, callback) => {
+    socket.on('chat message', async (name, room, msg, clientOffset, callback) => {
       let result;
       // 将发送的所有消息保存至数据库 
       try {
         // 插入消息
-        result = await db.run('INSERT INTO messages (user_id, content, room_id, client_offset) VALUES ((SELECT id FROM users WHERE socket_id = ?), ?, (SELECT id FROM rooms WHERE name = ?), ?)', socket_id, msg, room, clientOffset);
+        result = await db.run('INSERT INTO messages (user_id, content, room_id, client_offset) VALUES ((SELECT id FROM users WHERE name = ?), ?, (SELECT id FROM rooms WHERE name = ?), ?)', name, msg, room, clientOffset);
 
       } catch (e) {
         if (e.errno === 19 /* SQLITE_CONSTRAINT */) {

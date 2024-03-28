@@ -124,8 +124,8 @@
       e.preventDefault();
       if (input.value) {
         const clientOffset = counter++;
-        socket.emit('chat message', socket.id, name, room, input.value, clientOffset);
-        console.log(socket.id, name, room, input.value, clientOffset)
+        socket.emit('chat message', name, room, input.value, clientOffset);
+        console.log(name, room, input.value, clientOffset)
         input.value = '';
       }
     });
