@@ -125,7 +125,7 @@
       if (input.value) {
         const clientOffset = counter++;
         socket.emit('chat message', name, room, input.value, clientOffset);
-        console.log(name, room, input.value, clientOffset)
+        renderMsg({ user: name, text: input.value });
         input.value = '';
       }
     });
@@ -135,7 +135,6 @@
         renderMsg(message)
       })
       socket.on('groupList', (groupList) => {
-        console.log(groupList);
         groupEl.innerHTML = ''
         groupList.forEach(obj => {
           const roomName = Object.keys(obj)[0];
@@ -146,12 +145,13 @@
           groupEl.appendChild(item)
         })
       })
-    })
-    socket.on('chat message', (msg, serverOffset) => {
-      renderMsg(msg)
-      window.scrollTo(0, document.body.scrollHeight);
-      socket.auth.serverOffset = serverOffset;
+      socket.on('chat message', (msg, serverOffset) => {
+        renderMsg(msg)
+        window.scrollTo(0, document.body.scrollHeight);
+        socket.auth.serverOffset = serverOffset;
     });
+  })
+    
   </script>
 </body>
 

@@ -136,7 +136,7 @@ if (cluster.isPrimary) {
         return;
       }
       // 广播至频道
-      io.emit('chat message', { user: name, text: msg }, result.lastID);
+      socket.to(room).emit('chat message', { user: name, text: msg }, result.lastID);
       callback();
     });
     /* -如果断联，再次连接时得到 id > serverOffset 的记录
