@@ -178,6 +178,8 @@
         <div class="groupList-items">
           房间名称:BBBBB 房间人数:111
         </div> -->
+      
+      
       </div>
     </div>
     <!-- 右侧 -->
@@ -220,7 +222,7 @@
       </form>
     </div>
   </div>
-  <!-- <script type="module">
+  <script type="module">
 
     import { io } from "https://cdn.socket.io/4.7.5/socket.io.esm.min.js";
     let counter = 0;
@@ -251,6 +253,7 @@
         socket.emit('chat message', name, room, input.value, clientOffset);
         renderMsg({ user: name, text: input.value });
         input.value = '';
+        messages.scrollTo(0, messages.scrollHeight);
       }
     });
     socket.on('connect', () => {
@@ -258,6 +261,7 @@
       socket.on('message', (message) => {
         console.log(message)
         renderMsg(message)
+        messages.scrollTo(0, messages.scrollHeight);
       })
       socket.on('groupList', (groupList) => {
         groupEl.innerHTML = ''
@@ -273,13 +277,13 @@
       socket.on('chat message', (msg, serverOffset) => {
         console.log(msg)
         renderMsg(msg)
-        window.scrollTo(0, document.body.scrollHeight);
+        messages.scrollTo(0, messages.scrollHeight);
         socket.auth.serverOffset = serverOffset;
       });
 
     })
 
-  </script> -->
+  </script>
 </body>
 
 </html>
