@@ -96,16 +96,13 @@
       </form>
     </div>
   </div>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script>
-    const name = prompt('请输入你的名字');
-    const room = prompt('请输入房间号');
+  <script type="module">
 
+    import { io } from "https://cdn.socket.io/4.7.5/socket.io.esm.min.js";
     let counter = 0;
-
+    let joined = false;
     const socket = io({
       ackTimeout: 10000,
-      retries: 3,
       auth: {
         serverOffset: 0
       }
@@ -120,6 +117,9 @@
     const messages = document.getElementById('messages');
     const groupEl = document.querySelector('.groupList');
 
+    const name = prompt('请输入你的名字');
+    const room = prompt('请输入房间号');
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (input.value) {
@@ -132,6 +132,7 @@
     socket.on('connect', () => {
       socket.emit('join', name, room);
       socket.on('message', (message) => {
+        console.log(message)
         renderMsg(message)
       })
       socket.on('groupList', (groupList) => {
@@ -149,9 +150,10 @@
         renderMsg(msg)
         window.scrollTo(0, document.body.scrollHeight);
         socket.auth.serverOffset = serverOffset;
-    });
-  })
-    
+      });
+
+    })
+
   </script>
 </body>
 

@@ -16,7 +16,7 @@ import { createAdapter, setupPrimary } from '@socket.io/cluster-adapter';
 if (cluster.isPrimary) {
   // cluster 可以通过一个父进程管理一坨子进程的方式来实现集群
   const numCPUs = availableParallelism();
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 1; i++) {
     // 获取 CPU 个数来开启进程
     cluster.fork({
       PORT: 3000 + i
@@ -55,19 +55,17 @@ if (cluster.isPrimary) {
   const app = express();
   const server = createServer(app);
   const io = new Server(server, {
+    cors: true ,//允许跨域
     connectionStateRecovery: {},// 此功能将临时存储服务器发送的所有事件，并在客户端重新连接时尝试恢复客户端的状态：
     adapter: createAdapter()  // 集群适配器，用于在不同进程之间共享 WebSocket 连接的状态，从而实现多进程间的实时通信。
   });
-  // - 查询现在已有房间数以及该房间内在线人数
-  //  - 查询所有房间
-  //  - 查询每个房间内在线人数
   //  SSR 服务端渲染
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
   app.get('/', (req, res) => {
     res.sendFile(join(__dirname, 'index.html'));
   });
-
+  // - 查询现在已有房间数以及该房间内在线人数
   async function getRoomUsers() {
     const query = `
         SELECT rooms.name AS room_name, users.name AS user_name
@@ -75,11 +73,13 @@ if (cluster.isPrimary) {
         INNER JOIN rooms ON users.room_id = rooms.id
     `;
     return await db.all(query);
-}
+  }
 
   io.on('connection', async (socket) => {
+    // - 加入房间
+    // - 返回所有房间以及在线人数
     socket.on('join', async (name, room) => {
-
+      console.log(`join 触发`)
       // 检查房间是否已存在
       const existingRoom = await db.get('SELECT id FROM rooms WHERE name = ? LIMIT 1', room);
       if (!existingRoom) {
@@ -101,25 +101,26 @@ if (cluster.isPrimary) {
       // 查询数据库获取每个房间内的用户列表
       const roomUsers = await getRoomUsers();
 
-       // 将房间及其对应用户列表组装成数组形式
-    const groupList = {};
-    roomUsers.forEach(({ room_name, user_name }) => {
+      // 将房间及其对应用户列表组装成数组形式
+      const groupList = {};
+      roomUsers.forEach(({ room_name, user_name }) => {
         if (!groupList[room_name]) {
-            groupList[room_name] = [];
+          groupList[room_name] = [];
         }
         groupList[room_name].push(user_name);
-    }); 
-    
-    // 将对象转换为数组形式
-    const groupListArray = Object.keys(groupList).map(roomName => ({ [roomName]: groupList[roomName] }));
+      });
+
+      // 将对象转换为数组形式
+      const groupListArray = Object.keys(groupList).map(roomName => ({ [roomName]: groupList[roomName] }));
       // 发送给客户端
       socket.emit('groupList', groupListArray);
       socket.broadcast.emit('groupList', groupListArray);
-
       // 发送加入房间的消息
       socket.emit('message', { user: '管理员', text: `${name}进入了房间` });
-      socket.broadcast.to(room).emit('message', { user: '管理员', text: `${name}进入了房间` });
     });
+
+
+
     socket.on('chat message', async (name, room, msg, clientOffset, callback) => {
       let result;
       // 将发送的所有消息保存至数据库 
