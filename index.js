@@ -16,7 +16,7 @@ import { createAdapter, setupPrimary } from '@socket.io/cluster-adapter';
 if (cluster.isPrimary) {
   // cluster 可以通过一个父进程管理一坨子进程的方式来实现集群
   const numCPUs = availableParallelism();
-  for (let i = 0; i < 1; i++) {
+  for (let i = 0; i < 2; i++) {
     // 获取 CPU 个数来开启进程
     cluster.fork({
       PORT: 3000 + i
@@ -117,11 +117,12 @@ if (cluster.isPrimary) {
       socket.broadcast.emit('groupList', groupListArray);
       // 发送加入房间的消息
       socket.emit('message', { user: '管理员', text: `${name}进入了房间` });
+      socket.to(room).emit('message', { user: '管理员', text: `${name}进入了房间` });
     });
 
 
 
-    socket.on('chat message', async (name, room, msg, clientOffset, callback) => {
+    socket.on('chat message', async (name, room, msg, clientOffset) => {
       let result;
       // 将发送的所有消息保存至数据库 
       try {
@@ -130,7 +131,8 @@ if (cluster.isPrimary) {
 
       } catch (e) {
         if (e.errno === 19 /* SQLITE_CONSTRAINT */) {
-          callback();
+          // callback();
+          console.log("DataBase error")
         } else {
           // nothing to do, just let the client retry
         }
@@ -138,7 +140,7 @@ if (cluster.isPrimary) {
       }
       // 广播至频道
       socket.to(room).emit('chat message', { user: name, text: msg }, result.lastID);
-      callback();
+      // callback();
     });
     /* -如果断联，再次连接时得到 id > serverOffset 的记录
        - id 为数据库的自增主键，serverOffset 为各个进程的 id_clientOffset 偏移量
