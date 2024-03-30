@@ -84,10 +84,12 @@
       display: flex;
       flex-direction: column
     }
+
     .groupList {
       height: calc(100% - 50px);
       overflow: auto;
     }
+
     .groupList-header {
       height: 50px;
       background: #efefef;
@@ -128,58 +130,62 @@
       </div>
       <div class="groupList">
         <!-- <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
+          房间名称:AAAA 房间人数:star 在线 | lucy: 离线
         </div>
         <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:AAAA 房间人数:555
-        </div>
-        <div class="groupList-items">
-          房间名称:BBBBB 房间人数:111
+          房间名称:BBBB 房间人数:0
         </div> -->
-      
-      
+        <!-- <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:AAAA 房间人数:555
+          </div>
+          <div class="groupList-items">
+            房间名称:BBBBB 房间人数:111
+          </div> -->
       </div>
     </div>
     <!-- 右侧 -->
@@ -259,23 +265,29 @@
     socket.on('connect', () => {
       socket.emit('join', name, room);
       socket.on('message', (message) => {
-        console.log(message)
         renderMsg(message)
         messages.scrollTo(0, messages.scrollHeight);
       })
       socket.on('groupList', (groupList) => {
-        groupEl.innerHTML = ''
-        groupList.forEach(obj => {
-          const roomName = Object.keys(obj)[0];
-          const users = obj[roomName];
+        groupEl.innerHTML = '';
+        groupList.forEach(roomObj => {
+          const roomName = Object.keys(roomObj)[0];
+          const users = roomObj[roomName];
           const item = document.createElement('div');
           item.className = 'groupList-items';
-          item.innerText = `房间名称:${roomName} 房间人数:${users.length}`
-          groupEl.appendChild(item)
-        })
-      })
+          if (users.length > 0) {
+            const onlineUsers = users.filter(user => user.status === 1).map(user => user.name);
+            const offlineUsers = users.filter(user => user.status === 0).map(user => user.name);
+            const onlineUserText = onlineUsers.length > 0 ? `在线：${onlineUsers.join(', ')}` : '在线:0';
+            const offlineUserText = offlineUsers.length > 0 ? ` 离线：${offlineUsers.join(', ')}` : '离线:0';
+            item.innerText = `房间名称:${roomName} 房间人数:${users.length} | ${onlineUserText} ${offlineUserText}`;
+          } else {
+            item.innerText = `房间名称:${roomName} 房间人数:0`;
+          }
+          groupEl.appendChild(item);
+        });
+      });
       socket.on('chat message', (msg, serverOffset) => {
-        console.log(msg)
         renderMsg(msg)
         messages.scrollTo(0, messages.scrollHeight);
         socket.auth.serverOffset = serverOffset;
