@@ -252,6 +252,24 @@
     const name = prompt('请输入你的名字');
     const room = prompt('请输入房间号');
 
+    let isTyping
+    const renderTypingMessage = (user) => {
+      const typingMessage = document.getElementById('typing-message');
+      if (!typingMessage) {
+        const item = document.createElement('li');
+        item.id = 'typing-message';
+        item.textContent = `${user} 正在输入...`;
+        messages.appendChild(item);
+      }
+    };
+
+    const removeTypingMessage = () => {
+      const typingMessage = document.getElementById('typing-message');
+      if (typingMessage) {
+        typingMessage.remove();
+      }
+    };
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (input.value) {
@@ -260,6 +278,22 @@
         renderMsg({ user: name, text: input.value });
         input.value = '';
         messages.scrollTo(0, messages.scrollHeight);
+        // 用户发送消息后停止输入
+        isTyping = false;
+        console.log(22222222222222)
+        socket.emit('typing', name, room, false);
+      }
+    });
+    input.addEventListener('input', (e) => {
+      if (e.target.value && !isTyping) {
+        // 用户开始输入
+        isTyping = true;
+        socket.emit('typing', name, room, true);
+      } else if (!e.target.value && isTyping) {
+        // 用户停止输入
+        isTyping = false;
+        socket.emit('typing', name, room, false);
+        console.log(111111111)
       }
     });
     socket.on('connect', () => {
@@ -287,6 +321,16 @@
           groupEl.appendChild(item);
         });
       });
+      socket.on('user typing', (user) => {
+        if (user !== name) {
+          // 在UI中显示正在输入的用户
+          // 你可以在这里更新UI，比如显示一个正在输入的指示符号
+          renderTypingMessage(user);
+        }
+      });
+      socket.on('clear typing',()=>{
+        removeTypingMessage();
+      })
       socket.on('chat message', (msg, serverOffset) => {
         renderMsg(msg)
         messages.scrollTo(0, messages.scrollHeight);

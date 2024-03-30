@@ -128,7 +128,6 @@ if (cluster.isPrimary) {
       socket.emit('message', { user: '管理员', text: `${name}进入了房间` });
       socket.to(room).emit('message', { user: '管理员', text: `${name}进入了房间` });
     });
-
     socket.on('chat message', async (name, room, msg, clientOffset) => {
       let result;
       // 将发送的所有消息保存至数据库 
@@ -147,7 +146,13 @@ if (cluster.isPrimary) {
       }
       // 广播至频道
       socket.to(room).emit('chat message', { user: name, text: msg }, result.lastID);
-      // callback();
+    });
+    socket.on('typing', (name, room, isTyping) => {
+      if (isTyping) {
+        socket.to(room).emit('user typing', name);
+      } else {
+        socket.to(room).emit('clear typing');
+      }
     });
     socket.on('disconnect', async () => {
       // 更新用户状态
