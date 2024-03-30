@@ -34,7 +34,9 @@ if (cluster.isPrimary) {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT UNIQUE,
-      room_id INTEGER
+      room_id INTEGER,
+      socket_id TEXT,
+      status INTEGER DEFAULT 0
     );
   
     CREATE TABLE IF NOT EXISTS messages (
@@ -55,7 +57,7 @@ if (cluster.isPrimary) {
   const app = express();
   const server = createServer(app);
   const io = new Server(server, {
-    cors: true ,//允许跨域
+    cors: true,//允许跨域
     connectionStateRecovery: {},// 此功能将临时存储服务器发送的所有事件，并在客户端重新连接时尝试恢复客户端的状态：
     adapter: createAdapter()  // 集群适配器，用于在不同进程之间共享 WebSocket 连接的状态，从而实现多进程间的实时通信。
   });
@@ -68,18 +70,37 @@ if (cluster.isPrimary) {
   // - 查询现在已有房间数以及该房间内在线人数
   async function getRoomUsers() {
     const query = `
-        SELECT rooms.name AS room_name, users.name AS user_name
-        FROM users
-        INNER JOIN rooms ON users.room_id = rooms.id
+        SELECT rooms.name AS room_name, users.name AS user_name, users.status
+        FROM rooms
+        LEFT JOIN users ON rooms.id = users.room_id
     `;
     return await db.all(query);
   }
+  // 更新 groupList
+  async function updateGroupList() {
+    // 获取房间用户列表并更新 groupList
+    const roomUsers = await getRoomUsers();
+    const groupList = {};
 
+    roomUsers.forEach(({ room_name, user_name, status }) => {
+      if (!groupList[room_name]) {
+        groupList[room_name] = [];
+      }
+      if (user_name) {
+        groupList[room_name].push({ name: user_name, status: status });
+      }
+    });
+
+    // 将对象转换为数组形式
+    const groupListArray = Object.keys(groupList).map(roomName => ({ [roomName]: groupList[roomName] }));
+    return groupListArray;
+  }
   io.on('connection', async (socket) => {
-    // - 加入房间
-    // - 返回所有房间以及在线人数
+    let save_name, save_room
     socket.on('join', async (name, room) => {
-      console.log(`join 触发`)
+      console.log(`join 触发`);
+      save_name = name;
+      save_room = room;
       // 检查房间是否已存在
       const existingRoom = await db.get('SELECT id FROM rooms WHERE name = ? LIMIT 1', room);
       if (!existingRoom) {
@@ -87,40 +108,26 @@ if (cluster.isPrimary) {
         await db.run('INSERT INTO rooms (name) VALUES (?)', room);
       }
       socket.join(room);
-
       // 检查用户是否已存在
       const existingUser = await db.get('SELECT id FROM users WHERE name = ? LIMIT 1', name);
       if (!existingUser) {
         // 如果用户不存在，则插入新用户
-        await db.run('INSERT INTO users (name, room_id) VALUES (?, (SELECT id FROM rooms WHERE name = ?))', name, room);
+        await db.run('INSERT INTO users (name, room_id, socket_id, status) VALUES (?, (SELECT id FROM rooms WHERE name = ?),?, ?)', name, room, socket.id, 1);
       } else {
-        // 如果用户已存在，则更新用户所在的房间
-        await db.run('UPDATE users SET room_id = (SELECT id FROM rooms WHERE name = ?) WHERE name = ?', room, name);
+        // 如果用户已存在，则更新用户所在的房间以及 socket_id
+        await db.run('UPDATE users SET room_id = (SELECT id FROM rooms WHERE name = ?),socket_id = ?,status = ? WHERE name = ?', room, socket.id, 1, name);
       }
 
-      // 查询数据库获取每个房间内的用户列表
-      const roomUsers = await getRoomUsers();
+      const groupListArray = await updateGroupList();
 
-      // 将房间及其对应用户列表组装成数组形式
-      const groupList = {};
-      roomUsers.forEach(({ room_name, user_name }) => {
-        if (!groupList[room_name]) {
-          groupList[room_name] = [];
-        }
-        groupList[room_name].push(user_name);
-      });
-
-      // 将对象转换为数组形式
-      const groupListArray = Object.keys(groupList).map(roomName => ({ [roomName]: groupList[roomName] }));
       // 发送给客户端
       socket.emit('groupList', groupListArray);
       socket.broadcast.emit('groupList', groupListArray);
+
       // 发送加入房间的消息
       socket.emit('message', { user: '管理员', text: `${name}进入了房间` });
       socket.to(room).emit('message', { user: '管理员', text: `${name}进入了房间` });
     });
-
-
 
     socket.on('chat message', async (name, room, msg, clientOffset) => {
       let result;
@@ -142,6 +149,20 @@ if (cluster.isPrimary) {
       socket.to(room).emit('chat message', { user: name, text: msg }, result.lastID);
       // callback();
     });
+    socket.on('disconnect', async () => {
+      // 更新用户状态
+      await db.run('UPDATE users SET status = 0 WHERE socket_id = ?', socket.id);
+
+      const groupListArray = await updateGroupList();
+      // 发送给客户端
+      socket.emit('groupList', groupListArray);
+      socket.broadcast.emit('groupList', groupListArray);
+
+      // 发送离开房间的消息
+      socket.emit('message', { user: '管理员', text: `${save_name}离开了房间` });
+      socket.to(save_room).emit('message', { user: '管理员', text: `${save_name}离开了房间` });
+    })
+
     /* -如果断联，再次连接时得到 id > serverOffset 的记录
        - id 为数据库的自增主键，serverOffset 为各个进程的 id_clientOffset 偏移量
        - example :
