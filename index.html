@@ -162,7 +162,10 @@
     </div>
     <!-- 右侧 -->
     <div class="right">
-      <div class="groupList-header">聊天内容</div>
+      <div class="groupList-header">
+        聊天内容
+        <span id="room_name"></span>
+      </div>
       <!-- 消息区 -->
       <ul id="messages"></ul>
       <!-- 发表言论 -->
@@ -191,11 +194,11 @@
     const input = document.getElementById('input');
     const messages = document.getElementById('messages');
     const groupEl = document.querySelector('.groupList');
-
+    const room_name = document.getElementById('room_name');
 
     const name = prompt('请输入你的名字');
     const room = prompt('请输入房间号');
-
+    room_name.innerText = `(${room}房间)`;
     let isTyping
     const renderTypingMessage = (user) => {
       const typingMessage = document.getElementById('typing-message');
