@@ -95,6 +95,19 @@ if (cluster.isPrimary) {
     const groupListArray = Object.keys(groupList).map(roomName => ({ [roomName]: groupList[roomName] }));
     return groupListArray;
   }
+
+  async function findSocketByUsername(username) {
+    const query = `SELECT socket_id FROM users WHERE name = ? LIMIT 1`;
+    return await db.get(query, username);
+  }
+
+  async function getAllUsers() {
+    const query = `
+      SELECT name, status FROM users
+    `;
+    return await db.all(query);
+  }
+
   io.on('connection', async (socket) => {
     let save_name, save_room
     socket.on('join', async (name, room) => {
@@ -123,7 +136,11 @@ if (cluster.isPrimary) {
       // 发送给客户端
       socket.emit('groupList', groupListArray);
       socket.broadcast.emit('groupList', groupListArray);
-
+      // 用户加入更新在线人数
+      const allUsers = await getAllUsers();
+      // 将所有用户列表发送回客户端
+      socket.emit('user_List', allUsers);
+      socket.to(room).emit('user_List', allUsers);
       // 发送加入房间的消息
       socket.emit('message', { user: '管理员', text: `${name}进入了房间` });
       socket.to(room).emit('message', { user: '管理员', text: `${name}进入了房间` });
@@ -167,7 +184,23 @@ if (cluster.isPrimary) {
       socket.emit('message', { user: '管理员', text: `${save_name}离开了房间` });
       socket.to(save_room).emit('message', { user: '管理员', text: `${save_name}离开了房间` });
     })
-
+    socket.on('private message', async (targetUsername, message) => {
+      console.log(targetUsername,message)
+      // 找到目标用户的 socket
+      const { socket_id } = await findSocketByUsername(targetUsername);
+      if (socket_id) {
+        // 发送私聊消息给目标用户
+        console.log(socket_id)
+        socket.to(socket_id).emit('private message', save_name, message);
+      } else {
+        // 如果目标用户不在线，可以选择处理或者忽略
+        console.log(`${targetUsername} 不在线`);
+      }
+    });
+    // socket.on("private message", (name, msg) => {
+    //   const anotherSocketId = name;
+    //   socket.to(anotherSocketId).emit("private message", socket.id, msg);
+    // });
     /* -如果断联，再次连接时得到 id > serverOffset 的记录
        - id 为数据库的自增主键，serverOffset 为各个进程的 id_clientOffset 偏移量
        - example :
