@@ -16,7 +16,7 @@ import { createAdapter, setupPrimary } from '@socket.io/cluster-adapter';
 if (cluster.isPrimary) {
   // cluster 可以通过一个父进程管理一坨子进程的方式来实现集群
   const numCPUs = availableParallelism();
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < numCPUs; i++) {
     // 获取 CPU 个数来开启进程
     cluster.fork({
       PORT: 3000 + i
@@ -140,7 +140,7 @@ if (cluster.isPrimary) {
       const allUsers = await getAllUsers();
       // 将所有用户列表发送回客户端
       socket.emit('user_List', allUsers);
-      socket.to(room).emit('user_List', allUsers);
+      socket.broadcast.emit('user_List', allUsers);
       // 发送加入房间的消息
       socket.emit('message', { user: '管理员', text: `${name}进入了房间` });
       socket.to(room).emit('message', { user: '管理员', text: `${name}进入了房间` });
