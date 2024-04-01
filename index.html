@@ -78,19 +78,33 @@
 
     .left {
       height: 100%;
-      overflow: auto;
       width: 30%;
       background-color: aquamarine;
       display: flex;
       flex-direction: column
     }
 
+    .left_top {
+      height: 50%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .left_bottom {
+      height: 50%;
+      overflow: auto;
+      display: flex;
+      flex-direction: column
+    }
+
     .groupList {
-      height: calc(100% - 50px);
+      width: 100%;
+      height: 100%;
       overflow: auto;
     }
 
     .groupList-header {
+      width: calc(100% - 1px);
       height: 50px;
       background: #efefef;
       color: #8d0eb0;
@@ -118,110 +132,39 @@
       overflow: auto;
       flex-flow: row wrap
     }
+
+    .online {
+      color: green;
+      cursor: pointer;
+    }
+
+    .offline {
+      color: red;
+      pointer-events: none;
+    }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <!-- 左侧房间号、在线人数 -->
+    <!-- 左侧 -->
     <div class="left">
-      <div class="groupList-header">
-        房间在线人数
+      <!-- 房间 -->
+      <div class="left_top">
+        <div class="groupList-header">房间列表</div>
+        <div class="groupList"></div>
       </div>
-      <div class="groupList">
-        <!-- <div class="groupList-items">
-          房间名称:AAAA 房间人数:star 在线 | lucy: 离线
-        </div>
-        <div class="groupList-items">
-          房间名称:BBBB 房间人数:0
-        </div> -->
-        <!-- <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:AAAA 房间人数:555
-          </div>
-          <div class="groupList-items">
-            房间名称:BBBBB 房间人数:111
-          </div> -->
+      <!-- 在线人 -->
+      <div class="left_bottom">
+        <div class="groupList-header">私聊</div>
+        <div class="groupList" id="private-chat-list"></div>
       </div>
     </div>
     <!-- 右侧 -->
     <div class="right">
-      <div class="groupList-header">
-        聊天内容
-      </div>
+      <div class="groupList-header">聊天内容</div>
       <!-- 消息区 -->
-      <ul id="messages">
-        <!-- <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>user-message</li>
-        <li>test</li>
-        <li>test</li>
-        <li>test</li>
-        <li>66666666</li>
-        <li>66666666</li>
-        <li>66666666</li>
-        <li>66666666</li>
-        <li>66666666</li> -->
-      </ul>
+      <ul id="messages"></ul>
       <!-- 发表言论 -->
       <form id="form" action="">
         <input id="input" autocomplete="off" /><button>Send</button>
@@ -249,6 +192,7 @@
     const messages = document.getElementById('messages');
     const groupEl = document.querySelector('.groupList');
 
+
     const name = prompt('请输入你的名字');
     const room = prompt('请输入房间号');
 
@@ -270,6 +214,26 @@
       }
     };
 
+    const updateOnlineUsers = (private_user_List) => {
+      const privateChatList = document.getElementById('private-chat-list');
+      privateChatList.innerHTML = '';
+      private_user_List.forEach(({ name: username, status }) => {
+        if (username !== name) {
+          const item = document.createElement('div');
+          item.className = 'groupList-items';
+          item.id = 'user-items';
+          item.innerText = username;
+
+          if (status === 0) {
+            item.classList.add('offline');
+          } else {
+            item.classList.add('online');
+          }
+          privateChatList.appendChild(item);
+        }
+      });
+    };
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (input.value) {
@@ -280,7 +244,6 @@
         messages.scrollTo(0, messages.scrollHeight);
         // 用户发送消息后停止输入
         isTyping = false;
-        console.log(22222222222222)
         socket.emit('typing', name, room, false);
       }
     });
@@ -296,6 +259,7 @@
         console.log(111111111)
       }
     });
+
     socket.on('connect', () => {
       socket.emit('join', name, room);
       socket.on('message', (message) => {
@@ -321,14 +285,35 @@
           groupEl.appendChild(item);
         });
       });
+      // 展示在线用户并加入点击名称进入私聊
+      socket.on('private message', (name, msg) => {
+        console.log(222222222)
+        console.log(`${name}对你说: ${msg}`)
+      })
+      socket.on('user_List', (user_List) => {
+        console.log(user_List)
+        // 更新在线用户列表
+        updateOnlineUsers(user_List);
+        const user_items = document.querySelectorAll('#user-items')
+        user_items.forEach(item => {
+          item.addEventListener('click', (event) => {
+            const username = event.target.innerText;
+            if (username !== name) {
+              // 发送私聊消息给目标用户
+              const message = prompt(`请输入私聊消息给 ${username}`);
+              if (message) {
+                socket.emit('private message', username, message);
+              }
+            }
+          });
+        })
+      });
       socket.on('user typing', (user) => {
         if (user !== name) {
-          // 在UI中显示正在输入的用户
-          // 你可以在这里更新UI，比如显示一个正在输入的指示符号
           renderTypingMessage(user);
         }
       });
-      socket.on('clear typing',()=>{
+      socket.on('clear typing', () => {
         removeTypingMessage();
       })
       socket.on('chat message', (msg, serverOffset) => {
